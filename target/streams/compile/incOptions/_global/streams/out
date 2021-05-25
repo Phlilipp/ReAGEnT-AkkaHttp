@@ -1,0 +1,26 @@
+[debug] Created transactional ClassFileManager with tempDir = C:\Users\phili\Desktop\ReAGEnT\Akka\FirstAkkaHTTPProjekt\target\scala-2.12\classes.bak
+[debug] About to delete class files:
+[debug] 	Helpers$.class
+[debug] 	Main.class
+[debug] 	Helpers.class
+[debug] 	Helpers$ImplicitObservable.class
+[debug] 	Helpers$DocumentObservable.class
+[debug] 	Main$.class
+[debug] 	Helpers$GenericObservable.class
+[debug] We backup class files:
+[debug] 	Helpers$.class
+[debug] 	Main.class
+[debug] 	Helpers.class
+[debug] 	Helpers$ImplicitObservable.class
+[debug] 	Helpers$DocumentObservable.class
+[debug] 	Main$.class
+[debug] 	Helpers$GenericObservable.class
+[debug] Registering generated classes:
+[debug] 	Helpers$.class
+[debug] 	Main.class
+[debug] 	Helpers.class
+[debug] 	Helpers$ImplicitObservable.class
+[debug] 	Helpers$DocumentObservable.class
+[debug] 	Main$.class
+[debug] 	Helpers$GenericObservable.class
+[debug] Removing the temporary directory used for backing up class files: C:\Users\phili\Desktop\ReAGEnT\Akka\FirstAkkaHTTPProjekt\target\scala-2.12\classes.bak
