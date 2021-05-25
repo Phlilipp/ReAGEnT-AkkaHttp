@@ -1,8 +1,15 @@
+
 name := "ReAGEnT-AkkaHttp"
 
 version := "0.1"
 
 scalaVersion := "2.12.13"
+
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", xs@_*) => MergeStrategy.discard
+  case PathList("reference.conf") => MergeStrategy.concat
+  case x => MergeStrategy.first
+}
 
 val AkkaVersion = "2.6.8"
 val AkkaHttpVersion = "10.2.4"
