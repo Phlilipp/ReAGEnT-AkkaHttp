@@ -148,7 +148,7 @@ object Main extends CORSHandler {
     }
 
 
-    val bindingFuture = Http().newServerAt("localhost", 8080).bind(routes)
+    val bindingFuture = Http().newServerAt("127.0.0.1", 8080).bind(routes)
 
 
     println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
