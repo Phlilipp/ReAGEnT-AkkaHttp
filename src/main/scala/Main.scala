@@ -6,13 +6,10 @@ import Helpers.DocumentObservable
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpMethods.{DELETE, GET, OPTIONS, POST, PUT}
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{`Access-Control-Allow-Credentials`, `Access-Control-Allow-Headers`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Origin`}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{Directive0, Route}
-import org.mongodb.scala.{Document, MongoClient, MongoCollection, MongoDatabase}
 import com.mongodb.client.model.Filters
+import org.mongodb.scala.{Document, MongoClient, MongoCollection, MongoDatabase}
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.io.StdIn
@@ -33,6 +30,7 @@ object Main extends CORSHandler {
     val collectionCountTotalByHour: MongoCollection[Document] = database.getCollection("countTotalByHour")
     val collectionCountTotalByHourAndParty: MongoCollection[Document] = database.getCollection("countTotalByHourAndParty")
     val collectionCountTotalByParty: MongoCollection[Document] = database.getCollection("countTotalByParty")
+    val collectionCountTotalByYear: MongoCollection[Document] = database.getCollection("countTotalByYear")
 
     val collectionAvgTweetLengthByParty: MongoCollection[Document] = database.getCollection("avgTweetLengthByParty")
     val collectionAvgTweetLengthByTime: MongoCollection[Document] = database.getCollection("avgTweetLengthByTime")
@@ -97,6 +95,12 @@ object Main extends CORSHandler {
         }
     }
 
+    val countTotalByYear = path("countTotalByYear") {
+      get {
+        corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionCountTotalByYear.find().results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
+      }
+    }
+
     val avgTweetLengthByParty = path("avgTweetLengthByParty") {
       get {
         corsHandler(complete(HttpEntity(ContentTypes.`application/json`,collectionAvgTweetLengthByParty.find().results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
@@ -135,9 +139,11 @@ object Main extends CORSHandler {
         countTotalByHour,
         countTotalByHourAndParty,
         countTotalByParty,
+        countTotalByYear,
         avgTweetLengthByParty,
         avgTweetLengthByTime,
         avgTweetLengthByTimeAndParty,
+
 
         path("hello") {
           get {
@@ -148,7 +154,7 @@ object Main extends CORSHandler {
     }
 
 
-    val bindingFuture = Http().newServerAt("127.0.0.1", 8080).bind(routes)
+    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
 
 
     println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
