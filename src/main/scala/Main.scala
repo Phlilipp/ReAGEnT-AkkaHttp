@@ -17,7 +17,7 @@ import scala.io.StdIn
 object Main extends CORSHandler {
 
   def main(args: Array[String]): Unit = {
-    val mongoClient: MongoClient = MongoClient("mongodb://phillip:8hVnKoqd@reagent1.f4.htw-berlin.de:27017/?authSource=examples")
+    val mongoClient: MongoClient = MongoClient(sys.env("REAGENT_MONGO") + "?authSource=examples")
     val database: MongoDatabase = mongoClient.getDatabase("examples")
     val collectionProcessed: MongoCollection[Document] = database.getCollection("ProcessedTweets")
     val collectionOriginal: MongoCollection[Document] = database.getCollection("tweets_bundestag_complete")
