@@ -2,7 +2,6 @@
  * Copyright (C) 2020-2021 Lightbend Inc. <https://www.lightbend.com>
  */
 
-import Helpers.DocumentObservable
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
@@ -10,7 +9,8 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RequestContext, RouteResult}
 import com.mongodb.client.model.Filters
-import com.mongodb.spark.MongoSpark
+import com.mongodb.spark.config.ReadConfig
+import com.mongodb.spark.toSparkContextFunctions
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.bson.Document
@@ -31,12 +31,14 @@ object Main extends CORSHandler {
     implicit val executionContext: ExecutionContextExecutor = system.executionContext
 
 
-    val countTotalRDD = getRDD("countTotalByYear")
+    val countTotalYearRDD = getRDD("countTotalByYear")
+    val countTotalMonthRDD = getRDD("countTotalByMonth")
+    val countTotalWeekRDD = getRDD("countTotalByWeek")
 
 
     val routes = {
       concat(
-        getRoutesWithPartyYearMonth("countTweetByMonth", countTotalRDD, countTotalRDD, countTotalRDD)
+        getRoutesWithPartyYearMonth("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD)
       )
     }
 
@@ -66,7 +68,7 @@ object Main extends CORSHandler {
       .getOrCreate()
 
     val sc = sparkSession.sparkContext
-    MongoSpark.load(sc).rdd
+    sc.loadFromMongoDB(ReadConfig(Map("uri" -> (sys.env("REAGENT_MONGO") + "examples." + collectionName + "?authSource=examples")))).rdd
   }
 
 
@@ -87,31 +89,53 @@ object Main extends CORSHandler {
         pathEnd {
           get {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
-              val temp = collectionYear.map(elem => elem.get("_id").asInstanceOf[Document].get("party") -> (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.get("count")))
-                .groupBy(_._1).mapValues(_.map(_._2).toMap).collect()
+              val temp = collectionYear
+                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") -> (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.get("count")))
+                .groupBy(_._1)
+                .mapValues(_.map(_._2).toMap)
+                .collect()
               Json(DefaultFormats).write(temp)
             })))
           }
-        }
-        /*path(partyMatcher) { party =>
+        },
+        path(partyMatcher) { party =>
           get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionYear.find(Filters.eq("_id.party", party)).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionYear
+                .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
+                .map(elem => (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.getInteger("count")))
+                .collect()
+                .toMap
+              Json(DefaultFormats).write(temp)
+            })))
           }
         },
         path(IntNumber) { year =>
           get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionYear.find(Filters.eq("_id.year", year)).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionMonth
+                .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
+                .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
+                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .collect()
+              Json(DefaultFormats).write(temp)
+            })))
           }
         },
         path(IntNumber / partyMatcher) { (year, party) =>
           get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionYear.find(Filters.and(
-              Filters.eq("_id.year", year),
-              Filters.eq("_id.party", party))
-            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionMonth
+                .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
+                .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
+                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count")))
+                .collect()
+                .toMap
+              Json(DefaultFormats).write(temp)
+            })))
           }
-        },
-        path(IntNumber / IntNumber) { (year, month) =>
+        }
+        /*path(IntNumber / IntNumber) { (year, month) =>
           get {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
               Filters.eq("_id.year", year),
