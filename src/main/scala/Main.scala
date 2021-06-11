@@ -19,6 +19,7 @@ import org.json4s.jackson.Json
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.io.StdIn
+import scala.language.postfixOps
 
 object Main extends CORSHandler {
 
@@ -81,7 +82,136 @@ object Main extends CORSHandler {
    * /path/jahr/"week"/partei -> {"01": 124, "02": 642, ...}
    * /path/jahr/"month"/partei -> {"01": 1240, "02": 2425, ...}
    */
-  def getRoutesWithPartyYearMonth(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document]): RequestContext => Future[RouteResult] = {
+  def getRoutesWithCount(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document], timespan: String = ""): RequestContext => Future[RouteResult] = {
+
+    var yearString = "year"
+    var monthString = "month"
+    var weekString = "week"
+
+    if (timespan != "") {
+      yearString = timespan
+      monthString = timespan
+      weekString = timespan
+    }
+
+    pathPrefix(pathName) {
+      concat(
+        pathEnd {
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionYear
+                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") -> (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.get("count")))
+                .groupBy(_._1)
+                .mapValues(_.map(_._2).toMap)
+                .collect()
+              Json(DefaultFormats).write(temp)
+            })))
+          }
+        },
+        path(partyMatcher) { party =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionYear
+                .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
+                .map(elem => (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.getInteger("count")))
+                .collect()
+                .toMap
+              Json(DefaultFormats).write(temp)
+            })))
+          }
+        },
+        path(IntNumber / "month") { year =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionMonth
+                .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
+                .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
+                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .collect()
+              Json(DefaultFormats).write(temp)
+            })))
+          }
+        },
+        path(IntNumber / "week") { year =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionWeek
+                .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
+                .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
+                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .collect()
+              Json(DefaultFormats).write(temp)
+            })))
+          }
+        },
+        path(IntNumber / "month" / partyMatcher) { (year, party) =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionMonth
+                .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
+                .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
+                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count")))
+                .collect()
+                .toMap
+              Json(DefaultFormats).write(temp)
+            })))
+          }
+        },
+        path(IntNumber / "week" / partyMatcher) { (year, party) =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+              val temp = collectionWeek
+                .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
+                .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
+                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.getInteger("count")))
+                .collect()
+                .toMap
+              Json(DefaultFormats).write(temp)
+            })))
+          }
+        }
+        /*path(IntNumber / IntNumber) { (year, month) =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
+              Filters.eq("_id.year", year),
+              Filters.eq("_id.month", month))
+            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
+          }
+        },
+        path(IntNumber / IntNumber / partyMatcher) { (year, month, party) =>
+          get {
+            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
+              Filters.eq("_id.year", year),
+              Filters.eq("_id.month", month),
+              Filters.eq("_id.party", party))
+            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
+          }
+        }*/
+      )
+    }
+  }
+
+  /**
+   * Liefert Paths:
+   * /path -> [{"CDU" : {"2017": 12234, "2018": 63578, ...}}, {"SPD": {...}}, ...]
+   * /path/partei -> {"2017": 12234, "2018": 63578, ...}
+   * /path/jahr/"week" -> [{"CDU" : {"01": 124, "02": 642, ...}}, {"SPD": {...}}, ...]
+   * /path/jahr/"month" -> [{"CDU" : {"01": 1240, "02": 2425, ...}}, {"SPD": {...}}, ...]
+   * /path/jahr/"week"/partei -> {"01": 124, "02": 642, ...}
+   * /path/jahr/"month"/partei -> {"01": 1240, "02": 2425, ...}
+   */
+  def getRoutesWithStrings(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document], timespan: String = ""): RequestContext => Future[RouteResult] = {
+
+    var yearString = "year"
+    var monthString = "month"
+    var weekString = "week"
+
+    if (timespan != "") {
+      yearString = timespan
+      monthString = timespan
+      weekString = timespan
+    }
+
     pathPrefix(pathName) {
       concat(
         pathEnd {
