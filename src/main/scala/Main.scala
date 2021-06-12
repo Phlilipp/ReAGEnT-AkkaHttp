@@ -36,10 +36,26 @@ object Main extends CORSHandler {
     val countTotalMonthRDD = getRDD("countTotalByMonth")
     val countTotalWeekRDD = getRDD("countTotalByWeek")
 
+    val avgRepliesYearRDD = getRDD("avgRepliesByYear")
+    val avgRepliesMonthRDD = getRDD("avgRepliesByMonth")
+    val avgRepliesWeekRDD = getRDD("avgRepliesByWeek")
+
+    val avgLikesYearRDD = getRDD("avgLikesByYear")
+    val avgLikesMonthRDD = getRDD("avgLikesByMonth")
+    val avgLikesWeekRDD = getRDD("avgLikesByWeek")
+
+
+    val countHashtagsYearRDD = getRDD("hashtagsByHourAndParty")
+    val countHashtagsMonthRDD = getRDD("hashtagsByHourAndParty")
+    val countHashtagsWeekRDD = getRDD("hashtagsByHourAndParty")
+
 
     val routes = {
       concat(
-        getRoutesWithPartyYearMonth("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD)
+        getRoutesWithCount("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD),
+        getRoutesWithCount("averageReply", avgRepliesYearRDD, avgRepliesMonthRDD, avgRepliesWeekRDD),
+        getRoutesWithCount("averagelikestweet", avgLikesYearRDD, avgLikesMonthRDD, avgLikesWeekRDD),
+        getRoutesWithStrings("hashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5)
       )
     }
 
@@ -126,7 +142,7 @@ object Main extends CORSHandler {
               val temp = collectionMonth
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
                 .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
-                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.get("count").toString.toDouble)).toMap)
                 .collect()
               Json(DefaultFormats).write(temp)
             })))
@@ -138,7 +154,7 @@ object Main extends CORSHandler {
               val temp = collectionWeek
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
                 .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
-                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.get("count").toString.toDouble)).toMap)
                 .collect()
               Json(DefaultFormats).write(temp)
             })))
@@ -150,7 +166,7 @@ object Main extends CORSHandler {
               val temp = collectionMonth
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
                 .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
-                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count")))
+                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.get("count").toString.toDouble))
                 .collect()
                 .toMap
               Json(DefaultFormats).write(temp)
@@ -163,7 +179,7 @@ object Main extends CORSHandler {
               val temp = collectionWeek
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
                 .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
-                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.getInteger("count")))
+                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.get("count").toString.toDouble))
                 .collect()
                 .toMap
               Json(DefaultFormats).write(temp)
@@ -193,14 +209,14 @@ object Main extends CORSHandler {
 
   /**
    * Liefert Paths:
-   * /path -> [{"CDU" : {"2017": 12234, "2018": 63578, ...}}, {"SPD": {...}}, ...]
-   * /path/partei -> {"2017": 12234, "2018": 63578, ...}
-   * /path/jahr/"week" -> [{"CDU" : {"01": 124, "02": 642, ...}}, {"SPD": {...}}, ...]
-   * /path/jahr/"month" -> [{"CDU" : {"01": 1240, "02": 2425, ...}}, {"SPD": {...}}, ...]
-   * /path/jahr/"week"/partei -> {"01": 124, "02": 642, ...}
-   * /path/jahr/"month"/partei -> {"01": 1240, "02": 2425, ...}
+   * /path -> [{"CDU" : {"2017": {"1": "String1", ... "max": "StringMax"}, "2018": {...}, ...}, {"SPD": {...}}, ...]
+   * /path/partei -> {"2017": {"1": "String1", ... "max": "StringMax"}, "2018": {...}, ...}
+   * /path/jahr/"week" -> [{"CDU" : {"01": {"1": "String1", ... "max": "StringMax"}, "02": {...}, ...}, {"SPD": {...}}, ...]
+   * /path/jahr/"month" -> [{"CDU" : {"01": {"1": "String1", ... "max": "StringMax"}, "02": {...}, ...}, {"SPD": {...}}, ...]
+   * /path/jahr/"week"/partei -> {"01": {"1": "String1", ... "max": "StringMax"}, "02": {...}, ...}
+   * /path/jahr/"month"/partei -> {"01": {"1": "String1", ... "max": "StringMax"}, "02": {...}, ...}
    */
-  def getRoutesWithStrings(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document], timespan: String = ""): RequestContext => Future[RouteResult] = {
+  def getRoutesWithStrings(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document], takeCount: Int, timespan: String = ""): RequestContext => Future[RouteResult] = {
 
     var yearString = "year"
     var monthString = "month"
@@ -218,10 +234,15 @@ object Main extends CORSHandler {
           get {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
               val temp = collectionYear
-                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") -> (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.get("count")))
+                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                  (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                    elem.get("_id").asInstanceOf[Document].getString("hashtag"),
+                    elem.get("count")))
                 .groupBy(_._1)
-                .mapValues(_.map(_._2).toMap)
                 .collect()
+                .toMap
+                .mapValues(_.groupBy(_._2._1).mapValues(_.groupBy(_._2._2).mapValues(_.size).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap))
+                .toList
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -231,9 +252,14 @@ object Main extends CORSHandler {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
               val temp = collectionYear
                 .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
-                .map(elem => (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.getInteger("count")))
+                .map(elem => (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                    elem.get("_id").asInstanceOf[Document].getString("hashtag"),
+                    elem.get("count")))
+                .groupBy(_._1)
                 .collect()
                 .toMap
+                .mapValues(_.groupBy(_._2).mapValues(_.size).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap)
+                .toList
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -243,9 +269,15 @@ object Main extends CORSHandler {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
               val temp = collectionMonth
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
-                .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
-                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                  (elem.get("_id").asInstanceOf[Document].get("month").toString,
+                    elem.get("_id").asInstanceOf[Document].getString("hashtag"),
+                    elem.get("count")))
+                .groupBy(_._1)
                 .collect()
+                .toMap
+                .mapValues(_.groupBy(_._2._1).mapValues(_.groupBy(_._2._2).mapValues(_.size).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap))
+                .toList
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -255,9 +287,15 @@ object Main extends CORSHandler {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
               val temp = collectionWeek
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
-                .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
-                .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.getInteger("count"))).toMap)
+                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                  (elem.get("_id").asInstanceOf[Document].get("week").toString,
+                    elem.get("_id").asInstanceOf[Document].getString("hashtag"),
+                    elem.get("count")))
+                .groupBy(_._1)
                 .collect()
+                .toMap
+                .mapValues(_.groupBy(_._2._1).mapValues(_.groupBy(_._2._2).mapValues(_.size).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap))
+                .toList
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -268,9 +306,14 @@ object Main extends CORSHandler {
               val temp = collectionMonth
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
                 .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
-                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.getInteger("count")))
+                .map(elem => (elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].getString("hashtag"),
+                  elem.get("count")))
+                .groupBy(_._1)
                 .collect()
                 .toMap
+                .mapValues(_.groupBy(_._2).mapValues(_.size).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap)
+                .toList
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -278,12 +321,17 @@ object Main extends CORSHandler {
         path(IntNumber / "week" / partyMatcher) { (year, party) =>
           get {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
-              val temp = collectionWeek
+              val temp = collectionMonth
                 .filter(_.get("_id").asInstanceOf[Document].getInteger("year") == year)
                 .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
-                .map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.getInteger("count")))
+                .map(elem => (elem.get("_id").asInstanceOf[Document].get("week").toString,
+                  elem.get("_id").asInstanceOf[Document].getString("hashtag"),
+                  elem.get("count")))
+                .groupBy(_._1)
                 .collect()
                 .toMap
+                .mapValues(_.groupBy(_._2).mapValues(_.size).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap)
+                .toList
               Json(DefaultFormats).write(temp)
             })))
           }
