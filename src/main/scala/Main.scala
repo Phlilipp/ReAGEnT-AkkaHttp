@@ -61,6 +61,10 @@ object Main extends CORSHandler {
     val mostTweetsHourMonthRDD = getRDD("mostTweetsTimeByMonth")
     val mostTweetsHourWeekRDD = getRDD("mostTweetsTimeByWeek")
 
+    val mostActiveUsersByYearRDD = getRDD("mostActiveUsersByYear")
+    val mostActiveUsersByMonthRDD = getRDD("mostActiveUsersByMonth")
+    val mostActiveUsersByWeekRDD = getRDD("mostActiveUsersByWeek")
+
 
     val routes = {
       concat(
@@ -70,7 +74,8 @@ object Main extends CORSHandler {
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
         getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
         getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"),
-        getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour")
+        getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
+        getRoutesWithStrings("mostActiveUser",mostActiveUsersByYearRDD,mostActiveUsersByMonthRDD,mostActiveUsersByWeekRDD,10,"user")
       )
     }
 
