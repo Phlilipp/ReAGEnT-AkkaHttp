@@ -335,7 +335,7 @@ object Main extends CORSHandler {
                 .toMap
                 .mapValues(_.groupBy(_._2).mapValues(_.map(_._3.toString.toDouble).sum).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap)
                 .toList
-                .sortBy(_._1)
+                .sortBy(_._1.toLong)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -354,7 +354,7 @@ object Main extends CORSHandler {
                 .toMap
                 .mapValues(_.groupBy(_._2).mapValues(_.map(_._3.toString.toDouble).sum).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, elem._1._1)).toMap)
                 .toList
-                .sortBy(_._1)
+                .sortBy(_._1.toLong)
               Json(DefaultFormats).write(temp)
             })))
           }
