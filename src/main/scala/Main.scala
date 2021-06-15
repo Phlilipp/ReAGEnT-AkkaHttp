@@ -17,7 +17,6 @@ import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.io.StdIn
 import scala.language.postfixOps
 
 object Main extends CORSHandler {
@@ -82,11 +81,11 @@ object Main extends CORSHandler {
     val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
 
 
-    println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-    StdIn.readLine() // let it run until user presses return
-    bindingFuture
-      .flatMap(_.unbind()) // trigger unbinding from the port
-      .onComplete(_ => system.terminate()) // and shutdown when done
+    //println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
+    //StdIn.readLine() // let it run until user presses return
+    //bindingFuture
+      //.flatMap(_.unbind()) // trigger unbinding from the port
+      //.onComplete(_ => system.terminate()) // and shutdown when done
   }
 
 
