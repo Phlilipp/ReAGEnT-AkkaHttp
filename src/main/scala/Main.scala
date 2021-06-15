@@ -8,7 +8,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RequestContext, RouteResult}
-import com.mongodb.client.model.Filters
 import com.mongodb.spark.config.ReadConfig
 import com.mongodb.spark.toSparkContextFunctions
 import org.apache.spark.rdd.RDD
@@ -49,9 +48,9 @@ object Main extends CORSHandler {
     val mediaUsageWeekRDD = getRDD("mediaUsageByWeek")
 
 
-    val countHashtagsYearRDD = getRDD("hashtagsByHourAndParty")
-    val countHashtagsMonthRDD = getRDD("hashtagsByHourAndParty")
-    val countHashtagsWeekRDD = getRDD("hashtagsByHourAndParty")
+    val countHashtagsYearRDD = getRDD("hashtagsByYear")
+    val countHashtagsMonthRDD = getRDD("hashtagsByMonth")
+    val countHashtagsWeekRDD = getRDD("hashtagsByWeek")
 
     val mostTweetsWeekdayYearRDD = getRDD("mostTweetsDayByYear")
     val mostTweetsWeekdayMonthRDD = getRDD("mostTweetsDayByMonth")

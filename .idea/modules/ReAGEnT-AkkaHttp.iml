@@ -47,7 +47,7 @@
     <orderEntry type="library" name="sbt: com.univocity:univocity-parsers:2.9.0:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-beanutils:commons-beanutils:1.7.0:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-cli:commons-cli:1.2:jar" level="project" />
-    <orderEntry type="library" name="sbt: commons-codec:commons-codec:1.15:jar" level="project" />
+    <orderEntry type="library" name="sbt: commons-codec:commons-codec:1.10:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-collections:commons-collections:3.2.2:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-configuration:commons-configuration:1.6:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-digester:commons-digester:1.8:jar" level="project" />
@@ -55,7 +55,6 @@
     <orderEntry type="library" name="sbt: commons-io:commons-io:2.4:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-lang:commons-lang:2.6:jar" level="project" />
     <orderEntry type="library" name="sbt: commons-net:commons-net:3.1:jar" level="project" />
-    <orderEntry type="library" name="sbt: dnsjava:dnsjava:3.3.1:jar" level="project" />
     <orderEntry type="library" name="sbt: io.airlift:aircompressor:0.10:jar" level="project" />
     <orderEntry type="library" name="sbt: io.dropwizard.metrics:metrics-core:4.1.1:jar" level="project" />
     <orderEntry type="library" name="sbt: io.dropwizard.metrics:metrics-graphite:4.1.1:jar" level="project" />
@@ -118,7 +117,6 @@
     <orderEntry type="library" name="sbt: org.apache.httpcomponents:httpclient:4.2.5:jar" level="project" />
     <orderEntry type="library" name="sbt: org.apache.httpcomponents:httpcore:4.2.4:jar" level="project" />
     <orderEntry type="library" name="sbt: org.apache.ivy:ivy:2.4.0:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.apache.logging.log4j:log4j-api:2.14.0:jar" level="project" />
     <orderEntry type="library" name="sbt: org.apache.orc:orc-core:1.5.10:jar" level="project" />
     <orderEntry type="library" name="sbt: org.apache.orc:orc-mapreduce:1.5.10:jar" level="project" />
     <orderEntry type="library" name="sbt: org.apache.orc:orc-shims:1.5.10:jar" level="project" />
@@ -168,20 +166,13 @@
     <orderEntry type="library" name="sbt: org.json4s:json4s-jackson_2.12:3.6.6:jar" level="project" />
     <orderEntry type="library" name="sbt: org.json4s:json4s-scalap_2.12:3.6.6:jar" level="project" />
     <orderEntry type="library" name="sbt: org.lz4:lz4-java:1.7.1:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.mongodb.scala:mongo-scala-bson_2.12:2.9.0:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.mongodb.scala:mongo-scala-driver_2.12:2.9.0:jar" level="project" />
     <orderEntry type="library" name="sbt: org.mongodb.spark:mongo-spark-connector_2.12:3.0.1:jar" level="project" />
     <orderEntry type="library" name="sbt: org.mongodb:bson:4.0.5:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.mongodb:mongodb-driver-async:3.12.2:jar" level="project" />
     <orderEntry type="library" name="sbt: org.mongodb:mongodb-driver-core:4.0.5:jar" level="project" />
     <orderEntry type="library" name="sbt: org.mongodb:mongodb-driver-sync:4.0.5:jar" level="project" />
     <orderEntry type="library" name="sbt: org.mortbay.jetty:jetty-sslengine:6.1.26:jar" level="project" />
     <orderEntry type="library" name="sbt: org.mortbay.jetty:jetty-util:6.1.26:jar" level="project" />
     <orderEntry type="library" name="sbt: org.objenesis:objenesis:2.5.1:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.reactivemongo:reactivemongo-bson-api_2.12:1.0.3:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.reactivemongo:reactivemongo-core_2.12:1.0.3:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.reactivemongo:reactivemongo-shaded:1.0.3:jar" level="project" />
-    <orderEntry type="library" name="sbt: org.reactivemongo:reactivemongo_2.12:1.0.3:jar" level="project" />
     <orderEntry type="library" name="sbt: org.reactivestreams:reactive-streams:1.0.3:jar" level="project" />
     <orderEntry type="library" name="sbt: org.roaringbitmap:RoaringBitmap:0.7.45:jar" level="project" />
     <orderEntry type="library" name="sbt: org.roaringbitmap:shims:0.7.45:jar" level="project" />
