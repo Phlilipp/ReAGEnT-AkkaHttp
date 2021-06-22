@@ -16,6 +16,8 @@ import org.bson.Document
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
 
+import java.time.LocalDateTime
+import java.util.Calendar
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.postfixOps
 
@@ -64,6 +66,9 @@ object Main extends CORSHandler {
     val mostActiveUsersByWeekRDD = getRDD("mostActiveUsersByWeek")
 
 
+    val liveMostTweetsByHourRDD = getRDD("metricsByHourAndParty")
+
+
     val routes = {
       concat(
         getRoutesWithCount("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD),
@@ -73,12 +78,13 @@ object Main extends CORSHandler {
         getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
         getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"),
         getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
-        getRoutesWithStrings("mostActiveUser",mostActiveUsersByYearRDD,mostActiveUsersByMonthRDD,mostActiveUsersByWeekRDD,10,"user")
+        getRoutesWithStrings("mostActiveUser",mostActiveUsersByYearRDD,mostActiveUsersByMonthRDD,mostActiveUsersByWeekRDD,10,"user"),
+        getLiveRoutesWithCount("countTotalRunning", liveMostTweetsByHourRDD)
       )
     }
 
-
-    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
+    Http().newServerAt("0.0.0.0", 8080).bind(routes)
+//    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
 
 
     //println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
@@ -204,23 +210,6 @@ object Main extends CORSHandler {
             })))
           }
         }
-        /*path(IntNumber / IntNumber) { (year, month) =>
-          get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
-              Filters.eq("_id.year", year),
-              Filters.eq("_id.month", month))
-            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
-          }
-        },
-        path(IntNumber / IntNumber / partyMatcher) { (year, month, party) =>
-          get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
-              Filters.eq("_id.year", year),
-              Filters.eq("_id.month", month),
-              Filters.eq("_id.party", party))
-            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
-          }
-        }*/
       )
     }
   }
@@ -234,17 +223,7 @@ object Main extends CORSHandler {
    * /path/jahr/"week"/partei -> {"01": {"1": "String1", ... "max": "StringMax"}, "02": {...}, ...}
    * /path/jahr/"month"/partei -> {"01": {"1": "String1", ... "max": "StringMax"}, "02": {...}, ...}
    */
-  def getRoutesWithStrings(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document], takeCount: Int, searchString: String, timespan: String = ""): RequestContext => Future[RouteResult] = {
-
-    var yearString = "year"
-    var monthString = "month"
-    var weekString = "week"
-
-    if (timespan != "") {
-      yearString = timespan
-      monthString = timespan
-      weekString = timespan
-    }
+  def getRoutesWithStrings(pathName: String, collectionYear: RDD[Document], collectionMonth: RDD[Document], collectionWeek: RDD[Document], takeCount: Int, searchString: String): RequestContext => Future[RouteResult] = {
 
     pathPrefix(pathName) {
       concat(
@@ -357,55 +336,107 @@ object Main extends CORSHandler {
             })))
           }
         }
-        /*path(IntNumber / IntNumber) { (year, month) =>
-          get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
-              Filters.eq("_id.year", year),
-              Filters.eq("_id.month", month))
-            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
-          }
-        },
-        path(IntNumber / IntNumber / partyMatcher) { (year, month, party) =>
-          get {
-            corsHandler(complete(HttpEntity(ContentTypes.`application/json`, collectionMonth.find(Filters.and(
-              Filters.eq("_id.year", year),
-              Filters.eq("_id.month", month),
-              Filters.eq("_id.party", party))
-            ).results().map(_.toJson()).toArray.mkString("[", ",", "]"))))
-          }
-        }*/
       )
     }
   }
 
-  /*def main(args: Array[String]): Unit = {
-    val mongoClient: MongoClient = MongoClient(sys.env("REAGENT_MONGO") + "?authSource=examples")
-    val database: MongoDatabase = mongoClient.getDatabase("examples")
 
-    val collectionProcessed: MongoCollection[Document] = database.getCollection("ProcessedTweets")
-    val collectionOriginal: MongoCollection[Document] = database.getCollection("tweets_bundestag_complete")
+  /**
+   * Liefert Paths:
+   * /pathDay -> [{"CDU" : {"1": 4, "2": 1, ...}, {"SPD": {...}}, ...]
+   * /pathDay/partei -> {"1": 4, "2": 1, ...}
+   * /pathMonth -> [{"CDU" : {"1": 43, "2": 64, ...}, {"SPD": {...}}, ...]
+   * /pathMonth/partei -> {"1": 43, "2": 64, ...}
+   */
+  def getLiveRoutesWithCount(pathName: String, collectionHour: RDD[Document]): RequestContext => Future[RouteResult] = {
 
-    val collectionCountTotalByYear: MongoCollection[Document] = database.getCollection("countTotalByYear")
+    val now = LocalDateTime.now()
+    val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
+    val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
 
-    implicit val system: ActorSystem[Nothing] = ActorSystem(Behaviors.empty, "my-system")
-    // needed for the future flatMap/onComplete in the end
-    implicit val executionContext: ExecutionContextExecutor = system.executionContext
-
-
-    val routes = {
-      concat(
-        getRoutesWithPartyYearMonth("countTweetByMonth", collectionCountTotalByYear, collectionCountTotalByYear, collectionCountTotalByYear)
-      )
-    }
-
-
-    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
-
-
-    println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-    StdIn.readLine() // let it run until user presses return
-    bindingFuture
-      .flatMap(_.unbind()) // trigger unbinding from the port
-      .onComplete(_ => system.terminate()) // and shutdown when done
-  }*/
+    concat(// -> [{"CDU" : {"01": 4, "02": 1, ...}, {"SPD": {...}}, ...]
+      path((pathName + "Day")) {
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .groupBy(_._1)
+              .collect()
+              .toMap
+              .mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum))
+              .toList
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },// -> {"01": 4, "02": 1, ...}
+      path((pathName + "Day") / partyMatcher) { party =>
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .groupBy(_._1)
+              .filter(_._1 == party)
+              .collect()
+              .toMap
+              .mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum))
+              .toList
+              .head._2
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path((pathName + "Month")) {
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .groupBy(_._1)
+              .collect()
+              .toMap
+              .mapValues(_.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum))
+              .toList
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },// -> {"01": 4, "02": 1, ...}
+      path((pathName + "Month") / partyMatcher) { party =>
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .groupBy(_._1)
+              .filter(_._1 == party)
+              .collect()
+              .toMap
+              .mapValues(_.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum))
+              .toList
+              .head._2
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      }
+    )
+  }
 }
