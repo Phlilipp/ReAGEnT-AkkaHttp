@@ -70,7 +70,7 @@ object Main extends CORSHandler {
     val mostTaggedUsersByWeekRDD =  getRDD("mostTaggedUsersByWeek")
 
     val liveMostTweetsByHourRDD = getRDD("metricsByHourAndParty")
-
+    //TODO Links, Durchschnittliche Tweetlänge, Durchschnittliche Retweets, total replies
 
     val routes = {
       concat(
@@ -78,9 +78,9 @@ object Main extends CORSHandler {
         getRoutesWithCount("averageReply", avgRepliesYearRDD, avgRepliesMonthRDD, avgRepliesWeekRDD),
         getRoutesWithCount("averagelikestweet", avgLikesYearRDD, avgLikesMonthRDD, avgLikesWeekRDD),
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
-        getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
-        getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"),
-        getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
+        getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"), //Extra Route Without Placement and Top 100 and only per Year and overall
+        getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"), //TODO Remove Sorting
+        getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"), //Without Placement
         getRoutesWithStrings("mostActiveUser",mostActiveUsersByYearRDD,mostActiveUsersByMonthRDD,mostActiveUsersByWeekRDD,10,"user"),
         getRoutesWithStrings("mostTaggedUser",mostTaggedUsersByYearRDD,mostTaggedUsersByMonthRDD,mostTaggedUsersByWeekRDD,10,"taggedUser"),
         getLiveRoutesWithCount("countTotalRunning", liveMostTweetsByHourRDD)
@@ -144,10 +144,11 @@ object Main extends CORSHandler {
           get {
             corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
               val temp = collectionYear
-                .map(elem => elem.get("_id").asInstanceOf[Document].get("party") -> (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.get("count")))
+                .map(elem => elem.get("_id").asInstanceOf[Document].get("party").toString -> (elem.get("_id").asInstanceOf[Document].get("year").toString, elem.get("count")))
                 .groupBy(_._1)
                 .mapValues(_.map(_._2).toMap)
                 .collect()
+                .sortBy(_._1)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -172,6 +173,7 @@ object Main extends CORSHandler {
                 .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
                 .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("month").formatted("%02d"), elem.get("count").toString.toDouble)).toMap)
                 .collect()
+                .sortBy(_._1)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -184,6 +186,7 @@ object Main extends CORSHandler {
                 .groupBy(_.get("_id").asInstanceOf[Document].get("party").toString)
                 .mapValues(_.map(elem => (elem.get("_id").asInstanceOf[Document].getInteger("week").formatted("%02d"), elem.get("count").toString.toDouble)).toMap)
                 .collect()
+                .sortBy(_._1)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -244,6 +247,7 @@ object Main extends CORSHandler {
                 .toMap
                 .mapValues(_.groupBy(_._2._1).mapValues(_.groupBy(_._2._2).mapValues(_.map(_._2._3.toString.toDouble).sum).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, (elem._1._1, elem._1._2))).toMap))
                 .toList
+                .sortBy(_._1.toString)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -280,6 +284,7 @@ object Main extends CORSHandler {
                 .toMap
                 .mapValues(_.groupBy(_._2._1).mapValues(_.groupBy(_._2._2).mapValues(_.map(_._2._3.toString.toDouble).sum).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, (elem._1._1, elem._1._2))).toMap))
                 .toList
+                .sortBy(_._1.toString)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -298,6 +303,7 @@ object Main extends CORSHandler {
                 .toMap
                 .mapValues(_.groupBy(_._2._1).mapValues(_.groupBy(_._2._2).mapValues(_.map(_._2._3.toString.toDouble).sum).toList.sortBy(-_._2).take(takeCount).zipWithIndex.map(elem => ((elem._2 + 1).toString, (elem._1._1, elem._1._2))).toMap))
                 .toList
+                .sortBy(_._1.toString)
               Json(DefaultFormats).write(temp)
             })))
           }
@@ -347,10 +353,10 @@ object Main extends CORSHandler {
 
   /**
    * Liefert Paths:
-   * /pathDay -> [{"CDU" : {"1": 4, "2": 1, ...}, {"SPD": {...}}, ...]
-   * /pathDay/partei -> {"1": 4, "2": 1, ...}
-   * /pathMonth -> [{"CDU" : {"1": 43, "2": 64, ...}, {"SPD": {...}}, ...]
-   * /pathMonth/partei -> {"1": 43, "2": 64, ...}
+   * /path/day -> [{"CDU" : {"1": 4, "2": 1, ...}, {"SPD": {...}}, ...]
+   * /path/day/partei -> {"1": 4, "2": 1, ...}
+   * /path/month -> [{"CDU" : {"1": 43, "2": 64, ...}, {"SPD": {...}}, ...]
+   * /path/month/partei -> {"1": 43, "2": 64, ...}
    */
   def getLiveRoutesWithCount(pathName: String, collectionHour: RDD[Document]): RequestContext => Future[RouteResult] = {
 
@@ -358,8 +364,12 @@ object Main extends CORSHandler {
     val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
     val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
 
-    concat(// -> [{"CDU" : {"01": 4, "02": 1, ...}, {"SPD": {...}}, ...]
-      path((pathName + "Day")) {
+    val calendar = Calendar.getInstance()
+    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
+    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+    concat(
+      path(pathName / "day") {
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
             val temp = collectionHour
@@ -373,13 +383,14 @@ object Main extends CORSHandler {
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum))
+              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum), 24))
               .toList
+              .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
           })))
         }
-      },// -> {"01": 4, "02": 1, ...}
-      path((pathName + "Day") / partyMatcher) { party =>
+      },
+      path(pathName / "day" / partyMatcher) { party =>
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
             val temp = collectionHour
@@ -394,14 +405,14 @@ object Main extends CORSHandler {
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum))
+              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum), 24))
               .toList
               .head._2
             Json(DefaultFormats).write(temp)
           })))
         }
       },
-      path((pathName + "Month")) {
+      path(pathName / "month") {
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
             val temp = collectionHour
@@ -414,13 +425,14 @@ object Main extends CORSHandler {
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(_.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum))
+              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum), daysInMonth, 1))
               .toList
+              .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
           })))
         }
       },// -> {"01": 4, "02": 1, ...}
-      path((pathName + "Month") / partyMatcher) { party =>
+      path(pathName / "month" / partyMatcher) { party =>
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
             val temp = collectionHour
@@ -434,7 +446,7 @@ object Main extends CORSHandler {
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(_.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum))
+              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum), daysInMonth, 1))
               .toList
               .head._2
             Json(DefaultFormats).write(temp)
@@ -442,5 +454,10 @@ object Main extends CORSHandler {
         }
       }
     )
+  }
+
+  def addZeros(map: Map[String, Double], size: Int, offset: Int = 0): Map[String, Double] = {
+    val b = Array.fill(size)(0.0).zipWithIndex.map(elem => ((elem._2 + offset).toString, elem._1)).toList
+    map.toList.union(b).groupBy(_._1).mapValues(_.map(_._2).sum)
   }
 }
