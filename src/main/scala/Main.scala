@@ -67,7 +67,12 @@ object Main extends CORSHandler {
 
     val mostTaggedUsersByYearRDD = getRDD("mostTaggedUsersByYear")
     val mostTaggedUsersByMonthRDD = getRDD("mostTaggedUsersByMonth")
-    val mostTaggedUsersByWeekRDD =  getRDD("mostTaggedUsersByWeek")
+    val mostTaggedUsersByWeekRDD = getRDD("mostTaggedUsersByWeek")
+
+    val totalRepliesByYearRDD = getRDD("totalRepliesByYear")
+    val totalRepliesByMonthRDD = getRDD("totalRepliesByMonth")
+    val totalRepliesByWeekRDD = getRDD("totalRepliesByWeek")
+
 
     val liveMostTweetsByHourRDD = getRDD("metricsByHourAndParty")
 
@@ -78,29 +83,31 @@ object Main extends CORSHandler {
         getRoutesWithCount("averageReply", avgRepliesYearRDD, avgRepliesMonthRDD, avgRepliesWeekRDD),
         getRoutesWithCount("averagelikestweet", avgLikesYearRDD, avgLikesMonthRDD, avgLikesWeekRDD),
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
+        getRoutesWithCount("totalReplies", totalRepliesByYearRDD, totalRepliesByMonthRDD, totalRepliesByWeekRDD),
         getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
         getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"),
         getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
-        getRoutesWithStrings("mostActiveUser",mostActiveUsersByYearRDD,mostActiveUsersByMonthRDD,mostActiveUsersByWeekRDD,10,"user"),
-        getRoutesWithStrings("mostTaggedUser",mostTaggedUsersByYearRDD,mostTaggedUsersByMonthRDD,mostTaggedUsersByWeekRDD,10,"taggedUser"),
+        getRoutesWithStrings("mostActiveUser", mostActiveUsersByYearRDD, mostActiveUsersByMonthRDD, mostActiveUsersByWeekRDD, 10, "user"),
+        getRoutesWithStrings("mostTaggedUser", mostTaggedUsersByYearRDD, mostTaggedUsersByMonthRDD, mostTaggedUsersByWeekRDD, 10, "taggedUser"),
         getLiveRoutesWithCount("countTotalRunning", liveMostTweetsByHourRDD)
       )
     }
 
     Http().newServerAt("0.0.0.0", 8080).bind(routes)
-//    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
+    //    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
 
 
     //println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
     //StdIn.readLine() // let it run until user presses return
     //bindingFuture
-      //.flatMap(_.unbind()) // trigger unbinding from the port
-      //.onComplete(_ => system.terminate()) // and shutdown when done
+    //.flatMap(_.unbind()) // trigger unbinding from the port
+    //.onComplete(_ => system.terminate()) // and shutdown when done
   }
 
 
   /**
    * Liefert eine Mongo-Collection als RDD
+   *
    * @param collectionName Name der Mongo-Collection
    * @return RDD[Document]
    */
@@ -254,8 +261,8 @@ object Main extends CORSHandler {
               val temp = collectionYear
                 .filter(_.get("_id").asInstanceOf[Document].getString("party") == party)
                 .map(elem => (elem.get("_id").asInstanceOf[Document].get("year").toString,
-                    elem.get("_id").asInstanceOf[Document].get(searchString).toString,
-                    elem.get("count")))
+                  elem.get("_id").asInstanceOf[Document].get(searchString).toString,
+                  elem.get("count")))
                 .groupBy(_._1)
                 .collect()
                 .toMap
@@ -358,7 +365,7 @@ object Main extends CORSHandler {
     val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
     val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
 
-    concat(// -> [{"CDU" : {"01": 4, "02": 1, ...}, {"SPD": {...}}, ...]
+    concat( // -> [{"CDU" : {"01": 4, "02": 1, ...}, {"SPD": {...}}, ...]
       path((pathName + "Day")) {
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
@@ -378,7 +385,7 @@ object Main extends CORSHandler {
             Json(DefaultFormats).write(temp)
           })))
         }
-      },// -> {"01": 4, "02": 1, ...}
+      }, // -> {"01": 4, "02": 1, ...}
       path((pathName + "Day") / partyMatcher) { party =>
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
@@ -419,7 +426,7 @@ object Main extends CORSHandler {
             Json(DefaultFormats).write(temp)
           })))
         }
-      },// -> {"01": 4, "02": 1, ...}
+      }, // -> {"01": 4, "02": 1, ...}
       path((pathName + "Month") / partyMatcher) { party =>
         get {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
