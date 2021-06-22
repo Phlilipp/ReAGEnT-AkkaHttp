@@ -79,7 +79,7 @@ object Main extends CORSHandler {
 
 
     val liveMostTweetsByHourRDD = getRDD("metricsByHourAndParty")
-    //TODO Links, Durchschnittliche Tweetlänge, Durchschnittliche Retweets, total replies
+    //TODO Links, Durchschnittliche Tweetlänge
 
     val routes = {
       concat(
@@ -89,9 +89,9 @@ object Main extends CORSHandler {
         getRoutesWithCount("averageRetweetsTweet",avgRetweetsYearRDD, avgRetweetsMonthRDD, avgRetweetsWeekRDD),
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
         getRoutesWithCount("totalReplies",totalRepliesByYearRDD,totalRepliesByMonthRDD,totalRepliesByWeekRDD),
-        getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
-        getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"),
-        getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
+        getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"), //TODO 100er Hashtags ohne Ranking
+        getRoutesWithStrings("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"), //TODO Own Route without Ranking
+        getRoutesWithStrings("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"), //Ohne Ranking
         getRoutesWithStrings("mostActiveUser",mostActiveUsersByYearRDD,mostActiveUsersByMonthRDD,mostActiveUsersByWeekRDD,10,"user"),
         getRoutesWithStrings("mostTaggedUser",mostTaggedUsersByYearRDD,mostTaggedUsersByMonthRDD,mostTaggedUsersByWeekRDD,10,"taggedUser"),
         getLiveRoutesWithCount("countTotalRunning", liveMostTweetsByHourRDD)
