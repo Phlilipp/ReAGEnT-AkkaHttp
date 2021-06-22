@@ -44,6 +44,10 @@ object Main extends CORSHandler {
     val avgLikesMonthRDD = getRDD("avgLikesByMonth")
     val avgLikesWeekRDD = getRDD("avgLikesByWeek")
 
+    val avgRetweetsYearRDD = getRDD("avgRetweetsByYear")
+    val avgRetweetsMonthRDD = getRDD("avgRetweetsByMonth")
+    val avgRetweetsWeekRDD = getRDD("avgRetweetsByWeek")
+
     val mediaUsageYearRDD = getRDD("mediaUsageByYear")
     val mediaUsageMonthRDD = getRDD("mediaUsageByMonth")
     val mediaUsageWeekRDD = getRDD("mediaUsageByWeek")
@@ -82,6 +86,7 @@ object Main extends CORSHandler {
         getRoutesWithCount("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD),
         getRoutesWithCount("averageReply", avgRepliesYearRDD, avgRepliesMonthRDD, avgRepliesWeekRDD),
         getRoutesWithCount("averagelikestweet", avgLikesYearRDD, avgLikesMonthRDD, avgLikesWeekRDD),
+        getRoutesWithCount("averageRetweetsTweet",avgRetweetsYearRDD, avgRetweetsMonthRDD, avgRetweetsWeekRDD),
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
         getRoutesWithCount("totalReplies",totalRepliesByYearRDD,totalRepliesByMonthRDD,totalRepliesByWeekRDD),
         getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
