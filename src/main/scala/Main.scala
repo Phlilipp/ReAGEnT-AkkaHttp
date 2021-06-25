@@ -54,6 +54,10 @@ object Main extends CORSHandler {
     val mediaUsageMonthRDD = getRDD("mediaUsageByMonth")
     val mediaUsageWeekRDD = getRDD("mediaUsageByWeek")
 
+    val avgTweetLengthYearRDD = getRDD("avgTweetLengthByYear")
+    val avgTweetLengthMonthRDD = getRDD("avgTweetLengthByMonth")
+    val avgTweetLengthWeekRDD = getRDD("avgTweetLengthByWeek")
+
 
     val countHashtagsYearRDD = getRDD("hashtagsByYear")
     val countHashtagsMonthRDD = getRDD("hashtagsByMonth")
@@ -79,17 +83,29 @@ object Main extends CORSHandler {
     val totalRepliesByMonthRDD = getRDD("totalRepliesByMonth")
     val totalRepliesByWeekRDD = getRDD("totalRepliesByWeek")
 
+    val urlsByYearRDD = getRDD("urlsByYear")
+    val urlsByMonthRDD = getRDD("urlsByMonth")
+    val urlsByWeekRDD = getRDD("urlsByWeek")
+
 
     val liveMostTweetsByHourRDD = getRDD("metricsByHourAndParty")
 
+    val liveMediaUsage = getRDD("mediaUsageRunningByHourAndParty")
+
+    val liveSentiment = getRDD("sentimentRunningByHourAndParty")
+
+    val liveMostActiveUser = getRDD("mostActiveRunningByHourAndParty")
+
+    val liveSource = getRDD("sourceRunningByHourAndParty")
+
     val liveTweetsRDD = getRDD("lastTweets")
-    //TODO Links, Durchschnittliche Tweetlänge
 
     val routes = {
       concat(
         getRoutesWithCount("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD),
         getRoutesWithCount("averageReply", avgRepliesYearRDD, avgRepliesMonthRDD, avgRepliesWeekRDD),
         getRoutesWithCount("averagelikestweet", avgLikesYearRDD, avgLikesMonthRDD, avgLikesWeekRDD),
+        getRoutesWithCount("averageTweetLength", avgTweetLengthYearRDD, avgTweetLengthMonthRDD, avgTweetLengthWeekRDD),
         getRoutesWithCount("averageRetweetsTweet", avgRetweetsYearRDD, avgRetweetsMonthRDD, avgRetweetsWeekRDD),
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
         getRoutesWithCount("totalReplies", totalRepliesByYearRDD, totalRepliesByMonthRDD, totalRepliesByWeekRDD),
@@ -99,7 +115,12 @@ object Main extends CORSHandler {
         getRoutesWithStringsWithoutRanking("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
         getRoutesWithStrings("mostActiveUser", mostActiveUsersByYearRDD, mostActiveUsersByMonthRDD, mostActiveUsersByWeekRDD, 10, "user"),
         getRoutesWithStrings("mostTaggedUser", mostTaggedUsersByYearRDD, mostTaggedUsersByMonthRDD, mostTaggedUsersByWeekRDD, 10, "taggedUser"),
+        getRoutesWithStrings("mostUsedUrls", urlsByYearRDD, urlsByMonthRDD, urlsByWeekRDD, 10, "url"),
         getLiveRoutesWithCount("countTotalRunning", liveMostTweetsByHourRDD),
+        getLiveRoutesWithCount("liveMediaUsage", liveMediaUsage),
+        getLiveRoutesWithAverage("liveSentiment", liveSentiment, countName = "sentiment"),
+        getLiveRoutesWithStrings("liveMostActiveUser", liveMostActiveUser, "username"),
+        getLiveRoutesWithStrings("liveSource", liveSource, "source"),
         getLiveTweetsRoute("liveTweets", liveTweetsRDD)
       )
     }
@@ -522,7 +543,7 @@ object Main extends CORSHandler {
    * /path/month -> [{"CDU" : {"1": 43, "2": 64, ...}, {"SPD": {...}}, ...]
    * /path/month/partei -> {"1": 43, "2": 64, ...}
    */
-  def getLiveRoutesWithCount(pathName: String, collectionHour: RDD[Document]): RequestContext => Future[RouteResult] = {
+  def getLiveRoutesWithCount(pathName: String, collectionHour: RDD[Document], countName: String = "count"): RequestContext => Future[RouteResult] = {
 
     val now = LocalDateTime.now()
     val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
@@ -542,7 +563,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get("hour").toString,
-                  elem.get("count")))
+                  elem.get(countName)))
               .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
               .groupBy(_._1)
               .collect()
@@ -563,7 +584,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get("hour").toString,
-                  elem.get("count")))
+                  elem.get(countName)))
               .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
               .groupBy(_._1)
               .filter(_._1 == party)
@@ -584,7 +605,7 @@ object Main extends CORSHandler {
                 (elem.get("_id").asInstanceOf[Document].get("year").toString,
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
-                  elem.get("count")))
+                  elem.get(countName)))
               .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
               .groupBy(_._1)
               .collect()
@@ -604,7 +625,7 @@ object Main extends CORSHandler {
                 (elem.get("_id").asInstanceOf[Document].get("year").toString,
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
-                  elem.get("count")))
+                  elem.get(countName)))
               .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
               .groupBy(_._1)
               .filter(_._1 == party)
@@ -619,6 +640,234 @@ object Main extends CORSHandler {
       }
     )
   }
+
+
+  /**
+   * Liefert Paths:
+   * /path/day -> [{"CDU" : {"1": 1.543, "2": 1.7543, ...}, {"SPD": {...}}, ...]
+   * /path/day/partei -> {"1": 1.543, "2": 1.7543, ...}
+   * /path/month -> [{"CDU" : {"1": 1.543, "2": 1.7543, ...}, {"SPD": {...}}, ...]
+   * /path/month/partei -> {"1": 1.543, "2": 1.7543, ...}
+   */
+  def getLiveRoutesWithAverage(pathName: String, collectionHour: RDD[Document], countName: String = "count"): Route = {
+    val now = LocalDateTime.now()
+    val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
+    val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
+
+    val calendar = Calendar.getInstance()
+    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
+    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+    concat(
+      path(pathName / "day") {
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
+                  elem.get(countName)))
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .groupBy(_._1)
+              .collect()
+              .toMap
+              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues({ listOfDoubles =>
+                val doubles = listOfDoubles.map(_._2._5.toString.toDouble)
+                doubles.sum / doubles.size.toDouble
+              }), 24))
+              .toList
+              .sortBy(_._1.toString)
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path(pathName / "day" / partyMatcher) { party =>
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
+                  elem.get(countName)))
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .groupBy(_._1)
+              .filter(_._1 == party)
+              .collect()
+              .toMap
+              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues({ listOfDoubles =>
+                val doubles = listOfDoubles.map(_._2._5.toString.toDouble)
+                doubles.sum / doubles.size.toDouble
+              }), 24))
+              .toList
+              .head._2
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path(pathName / "month") {
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get(countName)))
+              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .groupBy(_._1)
+              .collect()
+              .toMap
+              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues({ listOfDoubles =>
+                val doubles = listOfDoubles.map(_._2._4.toString.toDouble)
+                doubles.sum / doubles.size.toDouble
+              }), daysInMonth, 1))
+              .toList
+              .sortBy(_._1.toString)
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path(pathName / "month" / partyMatcher) { party =>
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get(countName)))
+              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .groupBy(_._1)
+              .filter(_._1 == party)
+              .collect()
+              .toMap
+              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues({ listOfDoubles =>
+                val doubles = listOfDoubles.map(_._2._4.toString.toDouble)
+                doubles.sum / doubles.size.toDouble
+              }), daysInMonth, 1))
+              .toList
+              .head._2
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      }
+    )
+  }
+
+
+  /**
+   * Liefert Paths:
+   * /path/day -> [{"CDU" : {"1": {"1": "String1", ..., "max":"StringMax"}, "2": {...}, ...}, {"SPD": {...}}, ...]
+   * /path/day/partei -> {"1": {"1": "String1", ..., "max":"StringMax"}, "2": {...}, ...}
+   * /path/month -> [{"CDU" : {"1": {"1": "String1", ..., "max":"StringMax"}, "2": {...}, ...}, {"SPD": {...}}, ...]
+   * /path/month/partei -> {"1": {"1": "String1", ..., "max":"StringMax"}, "2": {...}, ...}
+   */
+  def getLiveRoutesWithStrings(pathName: String, collectionHour: RDD[Document], searchString: String): Route = {
+
+    val now = LocalDateTime.now()
+    val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
+    val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
+
+    val calendar = Calendar.getInstance()
+    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
+    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+    concat(
+      path(pathName / "day") {
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
+                  elem.get("_id").asInstanceOf[Document].get(searchString).toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .groupBy(_._1)
+              .collect()
+              .toMap
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum)), 24))
+              .toList
+              .sortBy(_._1.toString)
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path(pathName / "day" / partyMatcher) { party =>
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
+                  elem.get("_id").asInstanceOf[Document].get(searchString).toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .groupBy(_._1)
+              .filter(_._1 == party)
+              .collect()
+              .toMap
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum)), 24))
+              .toList
+              .head._2
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path(pathName / "month") {
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get(searchString).toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .groupBy(_._1)
+              .collect()
+              .toMap
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum)), daysInMonth, 1))
+              .toList
+              .sortBy(_._1.toString)
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      },
+      path(pathName / "month" / partyMatcher) { party =>
+        get {
+          corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
+            val temp = collectionHour
+              .map(elem => elem.get("_id").asInstanceOf[Document].get("party") ->
+                (elem.get("_id").asInstanceOf[Document].get("year").toString,
+                  elem.get("_id").asInstanceOf[Document].get("month").toString,
+                  elem.get("_id").asInstanceOf[Document].get("day").toString,
+                  elem.get("_id").asInstanceOf[Document].get(searchString).toString,
+                  elem.get("count")))
+              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .groupBy(_._1)
+              .filter(_._1 == party)
+              .collect()
+              .toMap
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum)), daysInMonth, 1))
+              .toList
+              .head._2
+            Json(DefaultFormats).write(temp)
+          })))
+        }
+      }
+    )
+  }
+
 
   /**
    * Liefert Paths:
@@ -659,5 +908,10 @@ object Main extends CORSHandler {
   def addZeros(map: Map[String, Double], size: Int, offset: Int = 0): Map[String, Double] = {
     val b = Array.fill(size)(0.0).zipWithIndex.map(elem => ((elem._2 + offset).toString, elem._1)).toList
     map.toList.union(b).groupBy(_._1).mapValues(_.map(_._2).sum)
+  }
+
+  def addEmptyLists(mapOfMaps: Map[String, Map[String, Double]], size: Int, offset: Int = 0): Map[String, Map[String, Double]] = {
+    val x = Array.fill(size)(Map()).zipWithIndex.map(elem => ((elem._2 + offset).toString, elem._1))
+    mapOfMaps.toList.union(x.toList).groupBy(_._1).mapValues(_.map(_._2).reduce((a, b) => a ++ b).map(e => (e._1.toString, e._2)))
   }
 }
