@@ -98,6 +98,8 @@ object Main extends CORSHandler {
 
     val liveSource = getRDD("sourceRunningByHourAndParty")
 
+    val liveHashtags = getRDD("hashtagsByHourAndParty")
+
     val liveTweetsRDD = getRDD("lastTweets")
 
     val routes = {
@@ -109,7 +111,7 @@ object Main extends CORSHandler {
         getRoutesWithCount("averageRetweetsTweet", avgRetweetsYearRDD, avgRetweetsMonthRDD, avgRetweetsWeekRDD),
         getRoutesWithCount("mediausagetweets", mediaUsageYearRDD, mediaUsageMonthRDD, mediaUsageWeekRDD),
         getRoutesWithCount("totalReplies", totalRepliesByYearRDD, totalRepliesByMonthRDD, totalRepliesByWeekRDD),
-        getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 5, "hashtag"),
+        getRoutesWithStrings("mostUsedHashtags", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 10, "hashtag"),
         getRoutesWithStringsWithoutRanking("mostUsedHashtagsCloud", countHashtagsYearRDD, countHashtagsMonthRDD, countHashtagsWeekRDD, 100, "hashtag"),
         getRoutesWithStringsWithoutRanking("mosttweetsday", mostTweetsWeekdayYearRDD, mostTweetsWeekdayMonthRDD, mostTweetsWeekdayWeekRDD, 7, "weekday"),
         getRoutesWithStringsWithoutRanking("mosttweetstime", mostTweetsHourYearRDD, mostTweetsHourMonthRDD, mostTweetsHourWeekRDD, 24, "hour"),
@@ -121,6 +123,7 @@ object Main extends CORSHandler {
         getLiveRoutesWithAverage("liveSentiment", liveSentiment, countName = "sentiment"),
         getLiveRoutesWithStrings("liveMostActiveUser", liveMostActiveUser, "username"),
         getLiveRoutesWithStrings("liveSource", liveSource, "source"),
+        getLiveRoutesWithStrings("liveHashtags", liveHashtags, "hashtag"),
         getLiveTweetsRoute("liveTweets", liveTweetsRDD)
       )
     }
@@ -538,8 +541,8 @@ object Main extends CORSHandler {
 
   /**
    * Liefert Paths:
-   * /path/day -> [{"CDU" : {"1": 4, "2": 1, ...}, {"SPD": {...}}, ...]
-   * /path/day/partei -> {"1": 4, "2": 1, ...}
+   * /path/day -> [{"CDU" : 12, {"SPD": 4}, ...]
+   * /path/day/partei -> {"CDU": 12}
    * /path/month -> [{"CDU" : {"1": 43, "2": 64, ...}, {"SPD": {...}}, ...]
    * /path/month/partei -> {"1": 43, "2": 64, ...}
    */
@@ -568,7 +571,7 @@ object Main extends CORSHandler {
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum), 24))
+              .mapValues(elem => elem.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).values.sum)
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -590,9 +593,9 @@ object Main extends CORSHandler {
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum), 24))
+              .mapValues(elem => elem.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).values.sum)
               .toList
-              .head._2
+              .head
             Json(DefaultFormats).write(temp)
           })))
         }
@@ -644,8 +647,8 @@ object Main extends CORSHandler {
 
   /**
    * Liefert Paths:
-   * /path/day -> [{"CDU" : {"1": 1.543, "2": 1.7543, ...}, {"SPD": {...}}, ...]
-   * /path/day/partei -> {"1": 1.543, "2": 1.7543, ...}
+   * /path/day -> [{"CDU" : 12, {"SPD": 4}, ...]
+   * /path/day/partei -> {"CDU": 12}
    * /path/month -> [{"CDU" : {"1": 1.543, "2": 1.7543, ...}, {"SPD": {...}}, ...]
    * /path/month/partei -> {"1": 1.543, "2": 1.7543, ...}
    */
@@ -792,7 +795,7 @@ object Main extends CORSHandler {
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum)), 24))
+              .mapValues(elem => elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum).values.sum).values.sum)
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -815,9 +818,9 @@ object Main extends CORSHandler {
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum)), 24))
+              .mapValues(elem => elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum).values.sum).values.sum)
               .toList
-              .head._2
+              .head
             Json(DefaultFormats).write(temp)
           })))
         }
@@ -836,7 +839,7 @@ object Main extends CORSHandler {
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum)), daysInMonth, 1))
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).toList.sortBy(-_._2).take(10).toMap), daysInMonth, 1))
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -858,7 +861,7 @@ object Main extends CORSHandler {
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum)), daysInMonth, 1))
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).toList.sortBy(-_._2).take(10).toMap), daysInMonth, 1))
               .toList
               .head._2
             Json(DefaultFormats).write(temp)
@@ -883,7 +886,9 @@ object Main extends CORSHandler {
               .map(elem => (elem.getString("_id"), elem.get("tweetIds").asInstanceOf[util.ArrayList[String]].asScala.toList))
               .mapValues(_.zipWithIndex.map(elem => (elem._2 + 1, elem._1)).toMap)
               .collect()
-              .sortBy(_._1)
+              .toList
+              .filter(_._1 == "combined")
+              .head
             Json(DefaultFormats).write(temp)
           })))
         }
