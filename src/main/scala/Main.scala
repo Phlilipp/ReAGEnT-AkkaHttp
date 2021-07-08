@@ -670,16 +670,15 @@ object Main extends CORSHandler {
                 (elem.get("_id").asInstanceOf[Document].get("year").toString,
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
-                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
                   elem.get(countName)))
               .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues({ listOfDoubles =>
-                val doubles = listOfDoubles.map(_._2._5.toString.toDouble)
+              .mapValues({ listOfDoubles =>
+                val doubles = listOfDoubles.map(_._2._4.toString.toDouble)
                 doubles.sum / doubles.size.toDouble
-              }), 24))
+              })
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -694,19 +693,18 @@ object Main extends CORSHandler {
                 (elem.get("_id").asInstanceOf[Document].get("year").toString,
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
-                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
                   elem.get(countName)))
               .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => addZeros(elem.groupBy(_._2._4).mapValues({ listOfDoubles =>
-                val doubles = listOfDoubles.map(_._2._5.toString.toDouble)
+              .mapValues({ listOfDoubles =>
+                val doubles = listOfDoubles.map(_._2._4.toString.toDouble)
                 doubles.sum / doubles.size.toDouble
-              }), 24))
+              })
               .toList
-              .head._2
+              .head
             Json(DefaultFormats).write(temp)
           })))
         }
@@ -788,14 +786,13 @@ object Main extends CORSHandler {
                 (elem.get("_id").asInstanceOf[Document].get("year").toString,
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
-                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
                   elem.get("_id").asInstanceOf[Document].get(searchString).toString,
                   elem.get("count")))
               .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum).values.sum).values.sum)
+              .mapValues(_.map(elem => (elem._2._4, elem._2._5.toString.toDouble)).groupBy(_._1).mapValues(_.map(_._2).sum).toList.sortBy(-_._2).head._1)
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -810,7 +807,6 @@ object Main extends CORSHandler {
                 (elem.get("_id").asInstanceOf[Document].get("year").toString,
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
-                  elem.get("_id").asInstanceOf[Document].get("hour").toString,
                   elem.get("_id").asInstanceOf[Document].get(searchString).toString,
                   elem.get("count")))
               .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
@@ -818,7 +814,7 @@ object Main extends CORSHandler {
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => elem.groupBy(_._2._4).mapValues(_.groupBy(_._2._5).mapValues(_.map(_._2._6.toString.toDouble).sum).values.sum).values.sum)
+              .mapValues(_.map(elem => (elem._2._4, elem._2._5.toString.toDouble)).groupBy(_._1).mapValues(_.map(_._2).sum).toList.sortBy(-_._2).head._1)
               .toList
               .head
             Json(DefaultFormats).write(temp)
