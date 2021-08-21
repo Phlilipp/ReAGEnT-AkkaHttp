@@ -874,6 +874,13 @@ object Main extends CORSHandler {
     )
   }
 
+  /**
+   * Fuegt 0en in die Datensaetze ein, da diese sonst nicht repraesentiert werden und aus in der Enddarstellung nicht sichtbar werden
+   * @param map Daten
+   * @param size Groesse der Daten
+   * @param offset Wird benoetigt, wenn die Daten nicht bei 0 anfangen (z.B. Stunde faengt bei 0 an, Tage bei 1)
+   * @return
+   */
   def addZeros(map: Map[String, Double], size: Int, offset: Int = 0): Map[String, Double] = {
     val b = Array.fill(size)(0.0).zipWithIndex.map(elem => ((elem._2 + offset).toString, elem._1)).toList
     map.toList.union(b).groupBy(_._1).mapValues(_.map(_._2).sum)
