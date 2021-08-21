@@ -1,6 +1,3 @@
-/*
- * Copyright (C) 2020-2021 Lightbend Inc. <https://www.lightbend.com>
- */
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
@@ -25,15 +22,15 @@ import collection.JavaConverters._
 
 object Main extends CORSHandler {
 
+  // Map aller Parteien, zum richtigen Weiterleiten bei Link Aufruf
   val partyMatcher = Map("CDU" -> "CDU", "SPD" -> "SPD", "FDP" -> "FDP", "Linke" -> "Linke", "B90" -> "B90", "AfD" -> "AfD", "CSU" -> "CSU", "Parteilos" -> "Parteilos")
 
   def main(args: Array[String]): Unit = {
 
     implicit val system: ActorSystem[Nothing] = ActorSystem(Behaviors.empty, "my-system")
-    // needed for the future flatMap/onComplete in the end
     implicit val executionContext: ExecutionContextExecutor = system.executionContext
 
-
+    // Zwischenspeichern der Daten aus der DB
     val countTotalYearRDD = getRDD("countTotalByYear")
     val countTotalMonthRDD = getRDD("countTotalByMonth")
     val countTotalWeekRDD = getRDD("countTotalByWeek")
@@ -102,6 +99,7 @@ object Main extends CORSHandler {
 
     val liveTweetsRDD = getRDD("lastTweets")
 
+    // Das Erstellen aller Routen
     val routes = {
       concat(
         getRoutesWithCount("countTweetByMonth", countTotalYearRDD, countTotalMonthRDD, countTotalWeekRDD),
@@ -128,15 +126,8 @@ object Main extends CORSHandler {
       )
     }
 
+    // Server startet
     Http().newServerAt("0.0.0.0", 8080).bind(routes)
-    //    val bindingFuture = Http().newServerAt("0.0.0.0", 8080).bind(routes)
-
-
-    //println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-    //StdIn.readLine() // let it run until user presses return
-    //bindingFuture
-    //.flatMap(_.unbind()) // trigger unbinding from the port
-    //.onComplete(_ => system.terminate()) // and shutdown when done
   }
 
 
@@ -157,7 +148,6 @@ object Main extends CORSHandler {
     val sc = sparkSession.sparkContext
     sc.loadFromMongoDB(ReadConfig(Map("uri" -> (sys.env("REAGENT_MONGO") + "examples." + collectionName + "?authSource=examples")))).rdd
   }
-
 
   /**
    * Liefert Paths:
@@ -548,13 +538,6 @@ object Main extends CORSHandler {
    */
   def getLiveRoutesWithCount(pathName: String, collectionHour: RDD[Document], countName: String = "count"): RequestContext => Future[RouteResult] = {
 
-    val now = LocalDateTime.now()
-    val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
-    val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
-
-    val calendar = Calendar.getInstance()
-    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
-    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
 
     concat(
       path(pathName / "day") {
@@ -567,7 +550,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get("hour").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == getToday())
               .groupBy(_._1)
               .collect()
               .toMap
@@ -588,7 +571,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get("hour").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == getToday())
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
@@ -609,11 +592,11 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .filter(elem => (elem._2._1, elem._2._2) == getMonth())
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum), daysInMonth, 1))
+              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum), getDaysOfMonth(), 1))
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -629,12 +612,12 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .filter(elem => (elem._2._1, elem._2._2) == getMonth())
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum), daysInMonth, 1))
+              .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues(_.map(_._2._4.toString.toDouble).sum), getDaysOfMonth(), 1))
               .toList
               .head._2
             Json(DefaultFormats).write(temp)
@@ -653,13 +636,6 @@ object Main extends CORSHandler {
    * /path/month/partei -> {"1": 1.543, "2": 1.7543, ...}
    */
   def getLiveRoutesWithAverage(pathName: String, collectionHour: RDD[Document], countName: String = "count"): Route = {
-    val now = LocalDateTime.now()
-    val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
-    val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
-
-    val calendar = Calendar.getInstance()
-    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
-    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
 
     concat(
       path(pathName / "day") {
@@ -671,7 +647,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == getToday())
               .groupBy(_._1)
               .collect()
               .toMap
@@ -694,7 +670,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == getToday())
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
@@ -718,14 +694,14 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .filter(elem => (elem._2._1, elem._2._2) == getMonth())
               .groupBy(_._1)
               .collect()
               .toMap
               .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues({ listOfDoubles =>
                 val doubles = listOfDoubles.map(_._2._4.toString.toDouble)
                 doubles.sum / doubles.size.toDouble
-              }), daysInMonth, 1))
+              }), getDaysOfMonth(), 1))
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -741,7 +717,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("month").toString,
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get(countName)))
-              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .filter(elem => (elem._2._1, elem._2._2) == getMonth())
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
@@ -749,7 +725,7 @@ object Main extends CORSHandler {
               .mapValues(elem => addZeros(elem.groupBy(_._2._3).mapValues({ listOfDoubles =>
                 val doubles = listOfDoubles.map(_._2._4.toString.toDouble)
                 doubles.sum / doubles.size.toDouble
-              }), daysInMonth, 1))
+              }), getDaysOfMonth(), 1))
               .toList
               .head._2
             Json(DefaultFormats).write(temp)
@@ -769,14 +745,6 @@ object Main extends CORSHandler {
    */
   def getLiveRoutesWithStrings(pathName: String, collectionHour: RDD[Document], searchString: String): Route = {
 
-    val now = LocalDateTime.now()
-    val today = (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
-    val currentMonth = (now.getYear.toString, now.getMonth.getValue.toString)
-
-    val calendar = Calendar.getInstance()
-    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
-    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-
     concat(
       path(pathName / "day") {
         get {
@@ -788,7 +756,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get(searchString).toString,
                   elem.get("count")))
-              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == getToday())
               .groupBy(_._1)
               .collect()
               .toMap
@@ -809,7 +777,7 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get(searchString).toString,
                   elem.get("count")))
-              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == today)
+              .filter(elem => (elem._2._1, elem._2._2, elem._2._3) == getToday())
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
@@ -831,11 +799,11 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get(searchString).toString,
                   elem.get("count")))
-              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .filter(elem => (elem._2._1, elem._2._2) == getMonth())
               .groupBy(_._1)
               .collect()
               .toMap
-              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).toList.sortBy(-_._2).take(10).toMap), daysInMonth, 1))
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).toList.sortBy(-_._2).take(10).toMap), getDaysOfMonth(), 1))
               .toList
               .sortBy(_._1.toString)
             Json(DefaultFormats).write(temp)
@@ -852,12 +820,12 @@ object Main extends CORSHandler {
                   elem.get("_id").asInstanceOf[Document].get("day").toString,
                   elem.get("_id").asInstanceOf[Document].get(searchString).toString,
                   elem.get("count")))
-              .filter(elem => (elem._2._1, elem._2._2) == currentMonth)
+              .filter(elem => (elem._2._1, elem._2._2) == getMonth())
               .groupBy(_._1)
               .filter(_._1 == party)
               .collect()
               .toMap
-              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).toList.sortBy(-_._2).take(10).toMap), daysInMonth, 1))
+              .mapValues(elem => addEmptyLists(elem.groupBy(_._2._3).mapValues(_.groupBy(_._2._4).mapValues(_.map(_._2._5.toString.toDouble).sum).toList.sortBy(-_._2).take(10).toMap), getDaysOfMonth(), 1))
               .toList
               .head._2
             Json(DefaultFormats).write(temp)
@@ -880,7 +848,7 @@ object Main extends CORSHandler {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
             val temp = collection
               .map(elem => (elem.getString("_id"), elem.get("tweetIds").asInstanceOf[util.ArrayList[String]].asScala.toList))
-              .mapValues(_.zipWithIndex.map(elem => (elem._2 + 1, elem._1)).toMap)
+              .mapValues(_.reverse.zipWithIndex.map(elem => (elem._2 + 1, elem._1)).toMap)
               .collect()
               .toList
               .filter(_._1 == "combined")
@@ -894,7 +862,7 @@ object Main extends CORSHandler {
           corsHandler(complete(HttpEntity(ContentTypes.`application/json`, {
             val temp = collection
               .map(elem => (elem.getString("_id"), elem.get("tweetIds").asInstanceOf[util.ArrayList[String]].asScala.toList))
-              .mapValues(_.zipWithIndex.map(elem => (elem._2 + 1, elem._1)).toMap)
+              .mapValues(_.reverse.zipWithIndex.map(elem => (elem._2 + 1, elem._1)).toMap)
               .collect()
               .toList
               .filter(_._1 == party)
@@ -911,8 +879,44 @@ object Main extends CORSHandler {
     map.toList.union(b).groupBy(_._1).mapValues(_.map(_._2).sum)
   }
 
+  /**
+   * Fuegt leere Listen in eine Map ein.
+   * @param mapOfMaps Daten
+   * @param size Gewuenschte Groesse der Daten
+   * @param offset Wird benoetigt, wenn die Daten nicht bei 0 anfangen (z.B. Stunde faengt bei 0 an, Tage bei 1)
+   * @return
+   */
   def addEmptyLists(mapOfMaps: Map[String, Map[String, Double]], size: Int, offset: Int = 0): Map[String, Map[String, Double]] = {
     val x = Array.fill(size)(Map()).zipWithIndex.map(elem => ((elem._2 + offset).toString, elem._1))
     mapOfMaps.toList.union(x.toList).groupBy(_._1).mapValues(_.map(_._2).reduce((a, b) => a ++ b).map(e => (e._1.toString, e._2)))
+  }
+
+  /**
+   * Gibt den aktuellen Tag zurueck
+   * @return (Jahr, Monat, Tag) als (String, String, String)
+   */
+  def getToday(): (String, String, String) = {
+    val now = LocalDateTime.now()
+    (now.getYear.toString, now.getMonth.getValue.toString, now.getDayOfMonth.toString)
+  }
+
+  /**
+   * Gibt den aktuellen Monat zurueck
+   * @return (Jahr, Monat) als (String,String)
+   */
+  def getMonth(): (String, String) = {
+    val now = LocalDateTime.now()
+    (now.getYear.toString, now.getMonth.getValue.toString)
+  }
+
+  /**
+   * Gibt die Anzahl an Tagen des aktuellen Monats zurück
+   * @return Anzahl Tage
+   */
+  def getDaysOfMonth(): Int = {
+    val now = LocalDateTime.now()
+    val calendar = Calendar.getInstance()
+    calendar.set(now.getYear, now.getMonth.getValue - 1, now.getDayOfMonth)
+    calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
   }
 }
